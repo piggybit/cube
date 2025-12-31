@@ -1,94 +1,200 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Pinkish Beating Heart</title>
+    <meta charset="utf-8">
+    <title>Pink 3D Beating Heart</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #222; }
-        canvas { display: block; }
+        body { margin: 0; overflow: hidden; }
     </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r124/three.min.js"></script>
+    <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
     <script>
-        // Scene setup
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        // Create the scene, camera, and renderer
+        function createScene() {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 30;
 
-        // Heart geometry (simple approximation: two lobes + base)
-        const heartGroup = new THREE.Group();
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-        // Left lobe
-        const leftSphere = new THREE.SphereGeometry(1, 32, 32);
-        const leftMaterial = new THREE.MeshPhongMaterial({ color: 0xff69b4 }); // Pinkish color
-        const leftMesh = new THREE.Mesh(leftSphere, leftMaterial);
-        leftMesh.position.set(-0.6, 0.5, 0);
-        heartGroup.add(leftMesh);
+            // Add light
+            const color = 0xFFFFFF;
+            const intensity = 0.75;
+            const light = new THREE.PointLight(color, intensity);
+            light.position.set(-15, -10, 30);
+            scene.add(light);
 
-        // Right lobe
-        const rightSphere = new THREE.SphereGeometry(1, 32, 32);
-        const rightMesh = new THREE.Mesh(rightSphere, leftMaterial);
-        rightMesh.position.set(0.6, 0.5, 0);
-        heartGroup.add(rightMesh);
+            return { scene, camera, renderer };
+        }
 
-        // Base (cone for pointy bottom)
-        const baseCone = new THREE.ConeGeometry(1.4, 2, 32);
-        const baseMesh = new THREE.Mesh(baseCone, leftMaterial);
-        baseMesh.position.set(0, -0.5, 0);
-        baseMesh.rotation.x = Math.PI; // Invert cone
-        heartGroup.add(baseMesh);
+        // Define heart coordinates and triangles
+        function useCoordinates() {
+            const coordinatesList = [
+                new THREE.Vector3(0, 2, 0),
+                new THREE.Vector3(-2, 1, 0),
+                new THREE.Vector3(-3, 3, 0),
+                new THREE.Vector3(-2, 4, 0),
+                new THREE.Vector3(0, 5, 0),
+                new THREE.Vector3(2, 4, 0),
+                new THREE.Vector3(3, 3, 0),
+                new THREE.Vector3(2, 1, 0),
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(-1, -1, 0),
+                new THREE.Vector3(-2, 0, 0),
+                new THREE.Vector3(-1.5, 1, 0),
+                new THREE.Vector3(0, 1, 0),
+                new THREE.Vector3(1.5, 1, 0),
+                new THREE.Vector3(2, 0, 0),
+                new THREE.Vector3(1, -1, 0),
+                new THREE.Vector3(0, -2, 0)
+            ];
 
-        // Merge for better performance (optional but cleans up)
-        const heartGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries([
-            leftMesh.geometry,
-            rightMesh.geometry,
-            baseMesh.geometry
-        ]);
-        const heartMesh = new THREE.Mesh(heartGeometry, leftMaterial);
-        heartMesh.position.set(0, -0.5, 0); // Center it
-        scene.add(heartMesh);
+            const trianglesIndexes = [
+                0, 1, 2,
+                0, 2, 3,
+                0, 3, 4,
+                0, 4, 5,
+                0, 5, 6,
+                0, 6, 7,
+                0, 7, 8,
+                8, 7, 9,
+                8, 9, 10,
+                8, 10, 11,
+                8, 11, 12,
+                8, 12, 13,
+                8, 13, 14,
+                8, 14, 15,
+                8, 15, 16
+            ];
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-        const pointLight = new THREE.PointLight(0xffffff, 1);
-        pointLight.position.set(5, 5, 5);
-        scene.add(pointLight);
+            return { coordinatesList, trianglesIndexes };
+        }
 
-        // Camera position
-        camera.position.z = 5;
+        // Create the heart mesh
+        function createHeartMesh(vertices, trianglesIndexes) {
+            const geo = new THREE.Geometry();
+            geo.vertices = vertices;
+
+            for (let i = 0; i < trianglesIndexes.length; i += 3) {
+                geo.faces.push(new THREE.Face3(
+                    trianglesIndexes[i],
+                    trianglesIndexes[i + 1],
+                    trianglesIndexes[i + 2]
+                ));
+            }
+
+            geo.computeVertexNormals();
+            const material = new THREE.MeshPhongMaterial({ 
+                color: 0xFFC0CB, // Pink color
+                wireframe: false 
+            });
+
+            const heartMesh = new THREE.Mesh(geo, material);
+            return { geo, material, heartMesh };
+        }
 
         // Animation variables
-        let time = 0;
-        const beatSpeed = 2; // Beats per second
-        const beatScale = 0.1; // Pulsing amount
+        let startAnim = false;
+        let scaleThreshold = false;
+        let beatingIncrement = 0.01;
 
-        // Animate function
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Beating animation: scale up/down periodically
-            time += 0.01;
-            const scale = 1 + Math.sin(time * beatSpeed * Math.PI) * beatScale;
-            heartMesh.scale.set(scale, scale, scale);
-
-            // Rotate for visual interest
-            heartMesh.rotation.y += 0.005;
-
-            renderer.render(scene, camera);
+        // Beating animation
+        function beatingAnimation(mesh) {
+            if (!scaleThreshold) {
+                mesh.scale.x += beatingIncrement;
+                mesh.scale.y += beatingIncrement;
+                mesh.scale.z += beatingIncrement;
+                if (mesh.scale.x >= 1.4) {
+                    scaleThreshold = true;
+                }
+            } else {
+                mesh.scale.x -= beatingIncrement;
+                mesh.scale.y -= beatingIncrement;
+                mesh.scale.z -= beatingIncrement;
+                if (mesh.scale.x <= 1) {
+                    scaleThreshold = false;
+                    startAnim = false;
+                }
+            }
         }
-        animate();
 
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        // Handle mouse click for beating animation
+        function handleMouseIntersection(camera, scene, meshUuid) {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            function onClick(event) {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(scene.children);
+
+                if (intersects.length && intersects[0].object.uuid === meshUuid) {
+                    startAnim = true;
+                }
+            }
+
+            return onClick;
+        }
+
+        // Set up controls
+        function setControls(camera, domElement, useDeviceOrientation = false) {
+            let controls;
+            if (useDeviceOrientation) {
+                // Device orientation controls would require additional script
+                // Not including here to keep standalone
+                controls = null;
+            } else {
+                controls = new THREE.OrbitControls(camera, domElement);
+            }
+            return { controls };
+        }
+
+        // Initialize the application
+        function init() {
+            const { scene, camera, renderer } = createScene();
+            const { coordinatesList, trianglesIndexes } = useCoordinates();
+            const { heartMesh } = createHeartMesh(coordinatesList, trianglesIndexes);
+
+            // Set mesh UUID for raycasting
+            heartMesh.uuid = heartMesh.uuid;
+
+            scene.add(heartMesh);
+            const { controls } = setControls(camera, renderer.domElement, false);
+
+            // Mouse click handler
+            const onClick = handleMouseIntersection(camera, scene, heartMesh.uuid);
+            window.addEventListener('click', onClick);
+
+            // Animation loop
+            const animate = function () {
+                requestAnimationFrame(animate);
+                renderer.render(scene, camera);
+                heartMesh.rotation.y -= 0.005;
+                if (startAnim) {
+                    beatingAnimation(heartMesh);
+                }
+                if (controls) {
+                    controls.update();
+                }
+            };
+            animate();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // Start the application
+        init();
     </script>
 </body>
 </html>
