@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Beating Heart</title>
+    <title>3D Pinkish Beating Heart</title>
     <style>
-        body { margin: 0; background: #111; }
+        body { margin: 0; overflow: hidden; background: #222; }
         canvas { display: block; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         // Scene setup
         const scene = new THREE.Scene();
@@ -19,35 +19,66 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
+        // Heart geometry (simple approximation: two lobes + base)
+        const heartGroup = new THREE.Group();
+
+        // Left lobe
+        const leftSphere = new THREE.SphereGeometry(1, 32, 32);
+        const leftMaterial = new THREE.MeshPhongMaterial({ color: 0xff69b4 }); // Pinkish color
+        const leftMesh = new THREE.Mesh(leftSphere, leftMaterial);
+        leftMesh.position.set(-0.6, 0.5, 0);
+        heartGroup.add(leftMesh);
+
+        // Right lobe
+        const rightSphere = new THREE.SphereGeometry(1, 32, 32);
+        const rightMesh = new THREE.Mesh(rightSphere, leftMaterial);
+        rightMesh.position.set(0.6, 0.5, 0);
+        heartGroup.add(rightMesh);
+
+        // Base (cone for pointy bottom)
+        const baseCone = new THREE.ConeGeometry(1.4, 2, 32);
+        const baseMesh = new THREE.Mesh(baseCone, leftMaterial);
+        baseMesh.position.set(0, -0.5, 0);
+        baseMesh.rotation.x = Math.PI; // Invert cone
+        heartGroup.add(baseMesh);
+
+        // Merge for better performance (optional but cleans up)
+        const heartGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries([
+            leftMesh.geometry,
+            rightMesh.geometry,
+            baseMesh.geometry
+        ]);
+        const heartMesh = new THREE.Mesh(heartGeometry, leftMaterial);
+        heartMesh.position.set(0, -0.5, 0); // Center it
+        scene.add(heartMesh);
+
         // Lighting
-        const light = new THREE.PointLight(0xffffff, 1, 100);
-        light.position.set(10, 10, 10);
-        scene.add(light);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 1);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
 
-        // Heart geometry (simplified using merged shapes)
-        const heartShape = new THREE.Shape();
-        heartShape.moveTo(0, 0);
-        heartShape.bezierCurveTo(0, -0.3, -0.5, -0.5, -0.5, 0);
-        heartShape.bezierCurveTo(-0.5, 0.5, 0, 1, 0.6, 0.9);
-        heartShape.bezierCurveTo(1.2, 1, 1.7, 0.5, 1.7, 0);
-        heartShape.bezierCurveTo(1.7, -0.5, 1.2, -0.3, 0.6, -0.6);
-        heartShape.bezierCurveTo(0.3, -0.8, 0, -0.8, 0, 0);
+        // Camera position
+        camera.position.z = 5;
 
-        const extrudeSettings = { depth: 0.2, bevelEnabled: true, bevelSegments: 2, steps: 2, bevelSize: 0.1, bevelThickness: 0.1 };
-        const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
-        const material = new THREE.MeshPhongMaterial({ color: 0xff0000, shininess: 100 });
-        const heart = new THREE.Mesh(geometry, material);
-        scene.add(heart);
-
-        camera.position.z = 3;
-
-        // Animation loop with beating effect
+        // Animation variables
         let time = 0;
+        const beatSpeed = 2; // Beats per second
+        const beatScale = 0.1; // Pulsing amount
+
+        // Animate function
         function animate() {
             requestAnimationFrame(animate);
-            time += 0.05;
-            heart.scale.set(1 + Math.sin(time) * 0.1, 1 + Math.sin(time) * 0.1, 1 + Math.sin(time) * 0.1); // Pulsate
-            heart.rotation.y += 0.01; // Rotate for dynamism
+
+            // Beating animation: scale up/down periodically
+            time += 0.01;
+            const scale = 1 + Math.sin(time * beatSpeed * Math.PI) * beatScale;
+            heartMesh.scale.set(scale, scale, scale);
+
+            // Rotate for visual interest
+            heartMesh.rotation.y += 0.005;
+
             renderer.render(scene, camera);
         }
         animate();
